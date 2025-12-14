@@ -23,8 +23,6 @@
 
 ## Быстрый старт
 
-### Локальная разработка
-
 1. Запустите MinIO и сервисы:
 ```bash
 docker-compose up -d
@@ -33,16 +31,6 @@ docker-compose up -d
 2. Backend будет доступен на `http://localhost:8000`
 3. Frontend будет доступен на `http://localhost:3000`
 4. MinIO Console будет доступна на `http://localhost:9001` (minioadmin/minioadmin)
-
-### Production развертывание
-
-1. Образы автоматически собираются и публикуются в GHCR при push в main/master
-2. На сервере используйте Traefik с лейблами для маршрутизации
-3. Образы:
-   - `ghcr.io/<owner>/<repo>-backend:latest`
-   - `ghcr.io/<owner>/<repo>-frontend:latest`
-
-Подробные инструкции по развертыванию см. в [DEPLOY.md](./DEPLOY.md)
 
 ## Конфигурация
 
@@ -68,24 +56,8 @@ docker-compose up -d
 - `DELETE /api/cleanup` - Ручная очистка старых файлов
 - `GET /api/health` - Health check
 
-## Traefik конфигурация
-
-Сервисы настроены для работы с Traefik через лейблы:
-
-- Frontend: `Host('tts.zorin.cloud')`
-- Backend: `Host('tts.zorin.cloud') && PathPrefix('/api')`
-
-Все маршруты используют:
-- Entrypoint: `websecure`
-- TLS: `letsencrypt`
-
 ## Очистка файлов
 
 Файлы автоматически удаляются через 1 час после создания. Очистка выполняется через отдельный контейнер `cleanup`, который запускается каждые 3600 секунд (1 час).
 
 Интервал очистки можно настроить через переменную окружения `CLEANUP_INTERVAL_HOURS` (по умолчанию: 1 час).
-
-## Лицензия
-
-MIT
-
