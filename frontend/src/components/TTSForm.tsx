@@ -20,8 +20,10 @@ const API_URL = (import.meta.env.VITE_API_URL as string | undefined) || '/api'
 function TTSForm({ onGenerate, loading }: TTSFormProps) {
   const [text, setText] = useState('')
   const [language, setLanguage] = useState('en')
+  const [gender, setGender] = useState<string | null>(null)
   const [voice, setVoice] = useState('')
   const [voices, setVoices] = useState<Voice[]>([])
+  const [filteredVoices, setFilteredVoices] = useState<Voice[]>([])
   const [loadingVoices, setLoadingVoices] = useState(true)
   const [previewing, setPreviewing] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -35,10 +37,29 @@ function TTSForm({ onGenerate, loading }: TTSFormProps) {
     loadVoices(language)
   }, [language])
 
-  // Reset voice when language changes
+  // Reset gender and voice when language changes
   useEffect(() => {
+    setGender(null)
     setVoice('')
   }, [language])
+
+  // Filter voices by gender
+  useEffect(() => {
+    if (gender) {
+      const filtered = voices.filter((v: Voice) => v.Gender === gender)
+      setFilteredVoices(filtered)
+      if (filtered.length > 0) {
+        // Check if current voice is in filtered list
+        const currentVoiceInFiltered = filtered.some((v: Voice) => v.ShortName === voice)
+        if (!currentVoiceInFiltered) {
+          const neuralVoice = filtered.find((v: Voice) => v.ShortName.includes('Neural'))
+          setVoice(neuralVoice ? neuralVoice.ShortName : filtered[0].ShortName)
+        }
+      }
+    } else {
+      setFilteredVoices(voices)
+    }
+  }, [gender, voices, voice])
 
   const loadVoices = async (lang: string) => {
     setLoadingVoices(true)
@@ -56,8 +77,8 @@ function TTSForm({ onGenerate, loading }: TTSFormProps) {
             return a.Gender.localeCompare(b.Gender)
           })
         setVoices(allVoices)
-        if (allVoices.length > 0 && !voice) {
-          // Default: prefer neural voices, then by locale
+        // Auto-select first voice when voices are loaded
+        if (allVoices.length > 0) {
           const neuralVoice = allVoices.find((v: Voice) => v.ShortName.includes('Neural'))
           setVoice(neuralVoice ? neuralVoice.ShortName : allVoices[0].ShortName)
         }
@@ -158,10 +179,15 @@ function TTSForm({ onGenerate, loading }: TTSFormProps) {
     }
   }, [voice])
 
-  const voiceOptions = voices.map((v) => ({
+  const voiceOptions = filteredVoices.map((v) => ({
     value: v.ShortName,
-    label: `${v.FriendlyName} (${v.Locale}, ${v.Gender})`,
+    label: `${v.FriendlyName} (${v.Locale})`,
   }))
+
+  // Get available genders for current language
+  const availableGenders = Array.from(new Set(voices.map((v: Voice) => v.Gender))).sort()
+  const showGenderSelector = availableGenders.length > 1
+  const showVoiceSelector = filteredVoices.length > 1
 
   const languageOptions = [
     { value: 'en', label: 'English' },
@@ -192,41 +218,78 @@ function TTSForm({ onGenerate, loading }: TTSFormProps) {
             disabled={loading}
           />
 
-          <div>
-            <Group justify="space-between" mb="xs">
-              <label style={{ fontSize: '14px', fontWeight: 500 }}>Voice</label>
-              <Tooltip label={previewing ? "Stop preview" : "Preview voice"}>
-                <ActionIcon
-                  variant="light"
-                  color={previewing ? "red" : "blue"}
-                  onClick={handlePreview}
-                  disabled={loading || loadingVoices || !voice}
-                  loading={previewing}
-                >
-                  {previewing ? <IconPlayerStop size={16} /> : <IconPlayerPlay size={16} />}
-                </ActionIcon>
-              </Tooltip>
-            </Group>
+          {showGenderSelector && (
             <Select
-              placeholder="Select a voice"
-              value={voice}
-              onChange={(value) => value && setVoice(value)}
-              data={voiceOptions}
+              label="Gender"
+              placeholder="Select gender (optional)"
+              value={gender}
+              onChange={(value) => setGender(value)}
+              data={availableGenders.map(g => ({ value: g, label: g }))}
               disabled={loading || loadingVoices}
-              searchable
+              clearable
             />
-            <audio
-              ref={audioRef}
-              onEnded={() => {
-                setPreviewing(false)
-                if (previewUrl) {
-                  URL.revokeObjectURL(previewUrl)
-                  setPreviewUrl(null)
-                }
-              }}
-              style={{ display: 'none' }}
-            />
-          </div>
+          )}
+
+          {showVoiceSelector && (
+            <div>
+              <Group justify="space-between" mb="xs">
+                <label style={{ fontSize: '14px', fontWeight: 500 }}>Voice</label>
+                <Tooltip label={previewing ? "Stop preview" : "Preview voice"}>
+                  <ActionIcon
+                    variant="light"
+                    color={previewing ? "red" : "blue"}
+                    onClick={handlePreview}
+                    disabled={loading || loadingVoices || !voice}
+                    loading={previewing}
+                  >
+                    {previewing ? <IconPlayerStop size={16} /> : <IconPlayerPlay size={16} />}
+                  </ActionIcon>
+                </Tooltip>
+              </Group>
+              <Select
+                placeholder="Select a voice"
+                value={voice}
+                onChange={(value) => value && setVoice(value)}
+                data={voiceOptions}
+                disabled={loading || loadingVoices}
+                searchable
+              />
+            </div>
+          )}
+
+          {!showVoiceSelector && voice && (
+            <div>
+              <Group justify="space-between" mb="xs">
+                <Text size="sm" fw={500}>Selected Voice</Text>
+                <Tooltip label={previewing ? "Stop preview" : "Preview voice"}>
+                  <ActionIcon
+                    variant="light"
+                    color={previewing ? "red" : "blue"}
+                    onClick={handlePreview}
+                    disabled={loading || loadingVoices}
+                    loading={previewing}
+                  >
+                    {previewing ? <IconPlayerStop size={16} /> : <IconPlayerPlay size={16} />}
+                  </ActionIcon>
+                </Tooltip>
+              </Group>
+              <Text size="sm" c="dimmed">
+                {filteredVoices.find(v => v.ShortName === voice)?.FriendlyName || voice}
+              </Text>
+            </div>
+          )}
+
+          <audio
+            ref={audioRef}
+            onEnded={() => {
+              setPreviewing(false)
+              if (previewUrl) {
+                URL.revokeObjectURL(previewUrl)
+                setPreviewUrl(null)
+              }
+            }}
+            style={{ display: 'none' }}
+          />
 
           <Button
             variant="subtle"
@@ -242,7 +305,7 @@ function TTSForm({ onGenerate, loading }: TTSFormProps) {
           <Collapse in={settingsOpened} mt="md">
             <Card withBorder p="md" bg="dark.7">
               <Stack gap="md">
-                <div>
+                <div style={{ marginBottom: '4px' }}>
                   <Group justify="space-between" mb="xs">
                     <Text size="sm" fw={500}>Speech Rate</Text>
                     <Text size="sm" c="dimmed">{rate === 0 ? 'Normal' : `${rate > 0 ? '+' : ''}${rate}%`}</Text>
@@ -262,7 +325,7 @@ function TTSForm({ onGenerate, loading }: TTSFormProps) {
                   />
                 </div>
 
-                <div>
+                <div style={{ marginBottom: '4px' }}>
                   <Group justify="space-between" mb="xs">
                     <Text size="sm" fw={500}>Voice Pitch</Text>
                     <Text size="sm" c="dimmed">{pitch === 0 ? 'Normal' : `${pitch > 0 ? '+' : ''}${pitch}Hz`}</Text>
@@ -281,7 +344,7 @@ function TTSForm({ onGenerate, loading }: TTSFormProps) {
                   />
                 </div>
 
-                <div>
+                <div style={{ marginBottom: '4px' }}>
                   <Group justify="space-between" mb="xs">
                     <Text size="sm" fw={500}>Volume</Text>
                     <Text size="sm" c="dimmed">{volume === 0 ? 'Normal' : `${volume > 0 ? '+' : ''}${volume}%`}</Text>

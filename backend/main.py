@@ -190,8 +190,12 @@ async def generate_audio_async(text: str, output_file: str, voice: str = "en-US-
 
 def wrap_text_with_ssml(text: str, rate: str = "+0%", pitch: str = "+0Hz", volume: str = "+0%") -> str:
     """Wrap text with SSML prosody tags for rate, pitch, and volume"""
-    # Escape XML special characters
-    text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    # Escape XML special characters properly
+    import html
+    # First escape HTML entities
+    text = html.escape(text, quote=False)
+    # Don't escape quotes in SSML, they're needed for attributes
+    # Return SSML with proper escaping
     return f'<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US"><prosody rate="{rate}" pitch="{pitch}" volume="{volume}">{text}</prosody></speak>'
 
 
@@ -362,12 +366,24 @@ async def download_file(file_id: str):
         # Download from MinIO
         minio_client.fget_object(MINIO_BUCKET, object_name, str(temp_file))
         
-        # Return file
-        return FileResponse(
-            path=temp_file,
+        # Read file content and return
+        with open(temp_file, "rb") as f:
+            content = f.read()
+        
+        # Clean up temp file
+        try:
+            os.remove(temp_file)
+        except:
+            pass
+        
+        # Return as response
+        return Response(
+            content=content,
             media_type="audio/mpeg",
-            filename=f"{file_id}.mp3",
-            background=lambda: os.remove(temp_file) if temp_file.exists() else None
+            headers={
+                "Content-Disposition": f'attachment; filename="{file_id}.mp3"',
+                "Content-Length": str(len(content))
+            }
         )
     
     except S3Error as e:
