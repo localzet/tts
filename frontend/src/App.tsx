@@ -77,13 +77,44 @@ function App() {
     <Page title="Text to Speech" appName="TTS Service">
       <div style={{
         minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         background: `
-          radial-gradient(circle at 20% 50%, rgba(6, 182, 212, 0.1) 0%, transparent 50%),
-          radial-gradient(circle at 80% 80%, rgba(6, 182, 212, 0.1) 0%, transparent 50%),
-          linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%)
+          radial-gradient(circle at 20% 30%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+          radial-gradient(circle at 80% 70%, rgba(6, 182, 212, 0.15) 0%, transparent 50%),
+          radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.1) 0%, transparent 70%),
+          linear-gradient(135deg, #0f0c29 0%, #1a1a3a 50%, #0f172a 100%)
         `,
         position: 'relative',
+        overflow: 'hidden',
       }}>
+        {/* Atom pattern background */}
+        <svg
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            opacity: 0.15,
+            pointerEvents: 'none',
+          }}
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <pattern id="atom-pattern" x="0" y="0" width="200" height="200" patternUnits="userSpaceOnUse">
+              <circle cx="100" cy="100" r="2" fill="rgba(139, 92, 246, 0.3)" />
+              <circle cx="100" cy="100" r="40" fill="none" stroke="rgba(6, 182, 212, 0.2)" strokeWidth="1" />
+              <circle cx="100" cy="100" r="60" fill="none" stroke="rgba(139, 92, 246, 0.2)" strokeWidth="1" />
+              <ellipse cx="100" cy="100" rx="40" ry="20" fill="none" stroke="rgba(99, 102, 241, 0.2)" strokeWidth="1" transform="rotate(45 100 100)" />
+              <ellipse cx="100" cy="100" rx="40" ry="20" fill="none" stroke="rgba(6, 182, 212, 0.2)" strokeWidth="1" transform="rotate(-45 100 100)" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#atom-pattern)" />
+        </svg>
+
+        {/* Grid overlay */}
         <div style={{
           position: 'absolute',
           top: 0,
@@ -91,12 +122,13 @@ function App() {
           right: 0,
           bottom: 0,
           backgroundImage: `
-            repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(6, 182, 212, 0.03) 2px, rgba(6, 182, 212, 0.03) 4px),
-            repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(6, 182, 212, 0.03) 2px, rgba(6, 182, 212, 0.03) 4px)
+            repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(139, 92, 246, 0.05) 40px, rgba(139, 92, 246, 0.05) 41px),
+            repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(6, 182, 212, 0.05) 40px, rgba(6, 182, 212, 0.05) 41px)
           `,
           pointerEvents: 'none',
         }} />
-        <Container size="md" py="xl" style={{ position: 'relative', zIndex: 1 }}>
+
+        <Container size="md" py="xl" style={{ position: 'relative', zIndex: 1, width: '100%' }}>
           <Stack gap="xl">
             <PageHeader
               icon={<IconMicrophone size={32} />}
@@ -129,7 +161,7 @@ function App() {
               </Card>
             )}
 
-            <Text size="sm" c="dimmed" ta="center" mt="xl" pb="md">
+            <Text size="sm" c="dimmed" ta="center" mt="auto" pt="xl" pb="md">
               © {new Date().getFullYear()} Zorin Projects. All rights reserved.
             </Text>
           </Stack>

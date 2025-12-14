@@ -239,7 +239,7 @@ function TTSForm({ onGenerate, loading }: TTSFormProps) {
             Advanced Settings
           </Button>
 
-          <Collapse in={settingsOpened}>
+          <Collapse in={settingsOpened} mt="md">
             <Card withBorder p="md" bg="dark.7">
               <Stack gap="md">
                 <div>
