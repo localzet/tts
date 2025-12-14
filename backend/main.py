@@ -65,6 +65,9 @@ class TTSRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=50000, description="Text to convert to speech")
     voice: Optional[str] = Field(default="en-US-DavisNeural", description="Voice name for TTS")
     language: Optional[str] = Field(default="en", description="Language code")
+    rate: Optional[str] = Field(default="+0%", description="Speech rate (-50% to +100%)")
+    pitch: Optional[str] = Field(default="+0Hz", description="Voice pitch (-50Hz to +50Hz)")
+    volume: Optional[str] = Field(default="+0%", description="Voice volume (-50% to +100%)")
 
 
 class TTSResponse(BaseModel):
@@ -112,12 +115,12 @@ def clean_text(text: str) -> str:
     return text
 
 
-async def generate_audio_async(text: str, output_file: str, voice: str = "en-US-DavisNeural") -> bool:
+async def generate_audio_async(text: str, output_file: str, voice: str = "en-US-DavisNeural", rate: str = "+0%", pitch: str = "+0Hz", volume: str = "+0%") -> bool:
     """Generate MP3 audio file from text using edge-tts"""
     max_length = 10000
     
     if len(text) <= max_length:
-        return await _generate_single_audio_async(text, output_file, voice)
+        return await _generate_single_audio_async(text, output_file, voice, rate, pitch, volume)
     else:
         # Split text into parts
         parts = []
@@ -144,7 +147,7 @@ async def generate_audio_async(text: str, output_file: str, voice: str = "en-US-
         temp_files = []
         for i, part in enumerate(parts):
             temp_file = output_file.replace('.mp3', f'_part{i+1}.mp3')
-            if await _generate_single_audio_async(part, temp_file, voice):
+            if await _generate_single_audio_async(part, temp_file, voice, rate, pitch, volume):
                 temp_files.append(temp_file)
             else:
                 # Cleanup on error
@@ -185,11 +188,23 @@ async def generate_audio_async(text: str, output_file: str, voice: str = "en-US-
         return False
 
 
-async def _generate_single_audio_async(text: str, output_file: str, voice: str, max_retries: int = 3) -> bool:
+def wrap_text_with_ssml(text: str, rate: str = "+0%", pitch: str = "+0Hz", volume: str = "+0%") -> str:
+    """Wrap text with SSML prosody tags for rate, pitch, and volume"""
+    # Escape XML special characters
+    text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return f'<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US"><prosody rate="{rate}" pitch="{pitch}" volume="{volume}">{text}</prosody></speak>'
+
+
+async def _generate_single_audio_async(text: str, output_file: str, voice: str, rate: str = "+0%", pitch: str = "+0Hz", volume: str = "+0%", max_retries: int = 3) -> bool:
     """Generate single audio file with retry logic"""
     for attempt in range(max_retries):
         try:
-            communicate = edge_tts.Communicate(text, voice)
+            # Wrap text with SSML if any parameter is not default
+            if rate != "+0%" or pitch != "+0Hz" or volume != "+0%":
+                text_with_ssml = wrap_text_with_ssml(text, rate, pitch, volume)
+                communicate = edge_tts.Communicate(text_with_ssml, voice)
+            else:
+                communicate = edge_tts.Communicate(text, voice)
             await communicate.save(output_file)
             return True
         except Exception as e:
@@ -229,7 +244,7 @@ async def list_voices(language: Optional[str] = None):
 
 
 @app.get("/api/preview")
-async def preview_voice(voice: str, language: Optional[str] = "en"):
+async def preview_voice(voice: str, language: Optional[str] = "en", rate: Optional[str] = "+0%", pitch: Optional[str] = "+0Hz", volume: Optional[str] = "+0%"):
     """Generate a short preview of a voice"""
     # Preview texts for different languages
     preview_texts = {
@@ -243,8 +258,16 @@ async def preview_voice(voice: str, language: Optional[str] = "en"):
     temp_file = TEMP_DIR / f"preview_{preview_id}.mp3"
     
     try:
-        # Generate preview audio
-        communicate = edge_tts.Communicate(preview_text, voice)
+        # Generate preview audio with SSML if needed
+        rate_val = rate or "+0%"
+        pitch_val = pitch or "+0Hz"
+        volume_val = volume or "+0%"
+        
+        if rate_val != "+0%" or pitch_val != "+0Hz" or volume_val != "+0%":
+            preview_text_ssml = wrap_text_with_ssml(preview_text, rate_val, pitch_val, volume_val)
+            communicate = edge_tts.Communicate(preview_text_ssml, voice)
+        else:
+            communicate = edge_tts.Communicate(preview_text, voice)
         await communicate.save(str(temp_file))
         
         # Read file content
@@ -288,8 +311,18 @@ async def generate_tts(request: TTSRequest):
         file_id = str(uuid.uuid4())
         temp_file = TEMP_DIR / f"{file_id}.mp3"
         
+        # Use default voice if not provided
+        voice = request.voice or "en-US-DavisNeural"
+        
         # Generate audio
-        success = await generate_audio_async(cleaned_text, str(temp_file), request.voice)
+        success = await generate_audio_async(
+            cleaned_text, 
+            str(temp_file), 
+            voice,
+            request.rate or "+0%",
+            request.pitch or "+0Hz",
+            request.volume or "+0%"
+        )
         
         if not success:
             raise HTTPException(status_code=500, detail="Failed to generate audio")
