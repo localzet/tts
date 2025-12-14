@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  backend:
+    image: ghcr.io/${GITHUB_REPOSITORY:-owner/repo}-backend:latest
+    container_name: tts-backend
+    environment:
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET:-tts-audio}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
+    depends_on:
+      - minio
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tts-backend.rule=Host(`tts.zorin.cloud`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.tts-backend.entrypoints=websecure"
+      - "traefik.http.routers.tts-backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.tts-backend.loadbalancer.server.port=8000"
+    restart: unless-stopped
+    networks:
+      - traefik
+
+  frontend:
+    image: ghcr.io/${GITHUB_REPOSITORY:-owner/repo}-frontend:latest
+    container_name: tts-frontend
+    depends_on:
+      - backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tts-frontend.rule=Host(`tts.zorin.cloud`)"
+      - "traefik.http.routers.tts-frontend.entrypoints=websecure"
+      - "traefik.http.routers.tts-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.tts-frontend.loadbalancer.server.port=80"
+    restart: unless-stopped
+    networks:
+      - traefik
+
+  cleanup:
+    image: ghcr.io/${GITHUB_REPOSITORY:-owner/repo}-backend:latest
+    container_name: tts-cleanup
+    command: ["sh", "-c", "while true; do python cleanup.py; sleep 3600; done"]
+    environment:
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET:-tts-audio}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
+      CLEANUP_INTERVAL_HOURS: ${CLEANUP_INTERVAL_HOURS:-1}
+    depends_on:
+      - minio
+    labels:
+      - "traefik.enable=false"
+    restart: unless-stopped
+
+networks:
+  traefik:
+    external: true
+

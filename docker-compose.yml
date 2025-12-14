@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: tts-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    labels:
+      - "traefik.enable=false"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tts-backend
+    environment:
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: tts-audio
+      MINIO_SECURE: "false"
+    depends_on:
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tts-backend.rule=Host(`tts.zorin.cloud`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.tts-backend.entrypoints=websecure"
+      - "traefik.http.routers.tts-backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.tts-backend.loadbalancer.server.port=8000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: tts-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tts-frontend.rule=Host(`tts.zorin.cloud`)"
+      - "traefik.http.routers.tts-frontend.entrypoints=websecure"
+      - "traefik.http.routers.tts-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.tts-frontend.loadbalancer.server.port=80"
+    restart: unless-stopped
+
+  cleanup:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.cleanup
+    container_name: tts-cleanup
+    environment:
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: tts-audio
+      MINIO_SECURE: "false"
+      CLEANUP_INTERVAL_HOURS: "1"
+    depends_on:
+      - minio
+      - backend
+    labels:
+      - "traefik.enable=false"
+    restart: unless-stopped
+
+volumes:
+  minio_data:
+
