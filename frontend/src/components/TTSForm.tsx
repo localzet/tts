@@ -15,6 +15,8 @@ interface TTSFormProps {
   loading: boolean
 }
 
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined) || '/api'
+
 function TTSForm({ onGenerate, loading }: TTSFormProps) {
   const [text, setText] = useState('')
   const [language, setLanguage] = useState('en')
@@ -32,8 +34,7 @@ function TTSForm({ onGenerate, loading }: TTSFormProps) {
   const loadVoices = async (lang: string) => {
     setLoadingVoices(true)
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || '/api'
-      const response = await fetch(`${apiUrl}/voices?language=${lang}`)
+      const response = await fetch(`${API_URL}/voices?language=${lang}`)
       if (response.ok) {
         const data = await response.json()
         const maleVoices = data.voices
@@ -86,8 +87,7 @@ function TTSForm({ onGenerate, loading }: TTSFormProps) {
 
     setPreviewing(true)
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || '/api'
-      const response = await fetch(`${apiUrl}/preview?voice=${encodeURIComponent(voice)}&language=${language}`)
+      const response = await fetch(`${API_URL}/preview?voice=${encodeURIComponent(voice)}&language=${language}`)
       
       if (!response.ok) {
         throw new Error('Failed to generate preview')

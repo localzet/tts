@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Page, PageHeader } from '@localzet/ui-kit'
 import { IconMicrophone } from '@tabler/icons-react'
-import { Container, Stack, Textarea, Button, Select, Group, Card, Text, Loader, Anchor } from '@mantine/core'
+import { Container, Stack, Button, Group, Card, Text, Loader, Anchor } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import TTSForm from './components/TTSForm'
 import AudioPlayer from './components/AudioPlayer'
@@ -11,6 +11,8 @@ interface TTSResponse {
   download_url: string
   expires_at: string
 }
+
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined) || '/api'
 
 function App() {
   const [loading, setLoading] = useState(false)
@@ -32,8 +34,7 @@ function App() {
     setFileId(null)
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || '/api'
-      const response = await fetch(`${apiUrl}/generate`, {
+      const response = await fetch(`${API_URL}/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -51,8 +52,7 @@ function App() {
 
       const data: TTSResponse = await response.json()
       setFileId(data.file_id)
-      const apiUrl = import.meta.env.VITE_API_URL || '/api'
-      setAudioUrl(`${apiUrl}/download/${data.file_id}`)
+      setAudioUrl(`${API_URL}/download/${data.file_id}`)
 
       notifications.show({
         title: 'Success',
